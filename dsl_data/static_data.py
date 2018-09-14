@@ -1,0 +1,10 @@
+#coding = utf-8
+black = {'low':[0,0,0], 'upper':[180, 255, 46]}
+grey = {'low':[0,0,46], 'upper':[180, 43, 220]}
+white = {'low':[0,0,221], 'upper':[180, 30, 255]}
+yellow = {'low':[11,43,46], 'upper':[34, 255, 255]}
+green = {'low':[35,43,46], 'upper':[99, 255, 255]}
+blue = {'low':[100,43,46], 'upper':[124, 255, 255]}
+purple = {'low':[125,43,46], 'upper':[155, 255, 255]}
+#clolors = [black, grey, white, yellow, green,  blue, purple]
+clolors = [yellow, green]
