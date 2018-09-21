@@ -340,6 +340,31 @@ def resize_image_fixed_size(image, image_size):
     window = (top_pad, left_pad, h + top_pad, w + left_pad)
     return image.astype(image_dtype), window, scale, padding, crop
 
+def crop_image_fixed_size(image, image_size):
+    image_dtype = image.dtype
+    h, w = image.shape[:2]
+    h_range = h - image_size[0]
+    w_range = w - image_size[1]
+    padx1 = np.random.randint(0, w_range)
+    pady1 = np.random.randint(0, h_range)
+    padx2 = padx1+image_size[1]
+    pady2 = pady1+image_size[0]
+    return image[pady1:pady2, padx1:padx2, :], np.asarray([padx1, pady1, padx2, pady2])
+
+def crop_image_with_box(image, image_size, box, labels):
+    labels = np.asarray(labels)
+    crop_image, pading = crop_image_fixed_size(image, image_size)
+    box[:, 0] = box[:, 0] - pading[0]
+    box[:, 1] = box[:, 1] - pading[1]
+    box[:, 2] = box[:, 2] - pading[0]
+    box[:, 3] = box[:, 3] - pading[1]
+    box = np.clip(box, a_min=0, a_max=max(image_size))
+    area = (box[:, 2]- box[:,0])*(box[:, 3]- box[:,1])
+    box = box[np.where(area>0)]
+    labels = labels[np.where(area>0)]
+    return crop_image, box, labels
+
+
 
 
 def revert_image(scale,padding,image_size,box):
