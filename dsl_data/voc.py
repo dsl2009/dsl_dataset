@@ -13,7 +13,7 @@ from dsl_data import visual
 classes = ['bicycle', 'bus', 'car', 'motorbike', 'person', 'rider', 'traffic light', 'traffic sign', 'train', 'truck']
 
 class VOCDetection(object):
-    def __init__(self, root, image_size, image_sets=[ ('2007', 'trainval'),('2012', 'trainval')]):
+    def __init__(self, root, image_size,is_crop=True, image_sets=[ ('2007', 'trainval'),('2012', 'trainval')]):
         self.root = root
         self.image_set = image_sets
         self.image_size = image_size
@@ -21,6 +21,7 @@ class VOCDetection(object):
         self._imgpath = osp.join('%s', 'JPEGImages', '%s.jpg')
         self.class_mapix = dict(zip(classes, range(len(classes))))
         self.ids = list()
+        self.is_crop = is_crop
         for (year, name) in image_sets:
             rootpath = osp.join(self.root, 'VOC' + year)
             for line in open(osp.join(rootpath, 'ImageSets', 'Main', name + '.txt')):
@@ -47,17 +48,22 @@ class VOCDetection(object):
                 label_idx = self.class_mapix[name]
                 labels.append(label_idx)
                 boxes.append(bndbox)
-
+        if len(boxes) == 0:
+            return None, None, None
         img = io.imread(self._imgpath % img_id)
         box = np.asarray(boxes)
-        ig, window, scale, padding, crop = utils.resize_image_fixed_size(img, self.image_size)
-        if len(labels)==0:
-            return ig, box, labels
-        box = box * scale
-        box[:, 0] = box[:, 0] + padding[1][0]
-        box[:, 1] = box[:, 1] + padding[0][0]
-        box[:, 2] = box[:, 2] + padding[1][1]
-        box[:, 3] = box[:, 3] + padding[0][1]
+        if not self.is_crop:
+            ig, window, scale, padding, crop = utils.resize_image_fixed_size(img, self.image_size)
+            if len(labels)==0:
+                return ig, box, labels
+            box = box * scale
+            box[:, 0] = box[:, 0] + padding[1][0]
+            box[:, 1] = box[:, 1] + padding[0][0]
+            box[:, 2] = box[:, 2] + padding[1][1]
+            box[:, 3] = box[:, 3] + padding[0][1]
+
+        else:
+            ig, box, labels = utils.crop_image_with_box(img, self.image_size, box, labels)
         box = box / np.asarray([self.image_size[1], self.image_size[0], self.image_size[1], self.image_size[0]])
         return ig, box, labels
 
@@ -65,12 +71,15 @@ class VOCDetection(object):
 
 def tt():
     image_dr = '/media/dsl/20d6b919-92e1-4489-b2be-a092290668e4/VOCdevkit/VOCdevkit'
-    data_set = VOCDetection(root=image_dr, image_size = [768, 1280])
+    data_set = VOCDetection(root=image_dr,is_crop=True,  image_size = [512, 512])
     ttlb = []
-    image_size = [768, 1280]
+    image_size = [512, 512]
 
     for x in range(100):
-        ig, box, labels = data_set.pull_item(x)
-        if len(labels) >0 :
-            box = box * np.asarray([image_size[1], image_size[0], image_size[1], image_size[0]])
-            visual.display_instances(ig,box)
+        result = data_set.pull_item(x)
+        if result:
+            ig, box, labels = data_set.pull_item(x)
+            if len(labels) >0 :
+                box = box * np.asarray([image_size[1], image_size[0], image_size[1], image_size[0]])
+                print(box)
+                visual.display_instances(ig,box)

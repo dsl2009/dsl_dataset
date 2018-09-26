@@ -343,17 +343,30 @@ def resize_image_fixed_size(image, image_size):
 def crop_image_fixed_size(image, image_size):
     image_dtype = image.dtype
     h, w = image.shape[:2]
+    scal = 1
+    if h<image_size[0] or w < image_size[1]:
+        scal = max([image_size[0]/h, image_size[1]/w])
+        image = cv2.resize(image, dsize=None, fx=scal, fy=scal)
+        h, w = image.shape[:2]
     h_range = h - image_size[0]
     w_range = w - image_size[1]
-    padx1 = np.random.randint(0, w_range)
-    pady1 = np.random.randint(0, h_range)
+    if w_range == 0:
+        padx1 = 0
+    else:
+        padx1 = np.random.randint(0, w_range)
+    if h_range == 0:
+        pady1 = 0
+    else:
+        pady1 = np.random.randint(0, h_range)
     padx2 = padx1+image_size[1]
     pady2 = pady1+image_size[0]
-    return image[pady1:pady2, padx1:padx2, :], np.asarray([padx1, pady1, padx2, pady2])
+    return image[pady1:pady2, padx1:padx2, :], np.asarray([padx1, pady1, padx2, pady2]), scal
 
 def crop_image_with_box(image, image_size, box, labels):
     labels = np.asarray(labels)
-    crop_image, pading = crop_image_fixed_size(image, image_size)
+    crop_image, pading, scale= crop_image_fixed_size(image, image_size)
+
+    box = box*scale
     box[:, 0] = box[:, 0] - pading[0]
     box[:, 1] = box[:, 1] - pading[1]
     box[:, 2] = box[:, 2] - pading[0]

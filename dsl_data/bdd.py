@@ -6,6 +6,7 @@ import numpy as np
 from dsl_data import visual, utils
 from matplotlib import pyplot as plt
 import cv2
+from dsl_data import coco_handler
 classes = ['bike', 'bus', 'car', 'motor', 'person', 'rider', 'traffic light', 'traffic sign', 'train', 'truck']
 
 
@@ -91,6 +92,56 @@ class BDD_AREA(object):
         labels[:, :, 1] = alter[:, :, 0]
         return ig, labels
 
+class BDD_AREA_MASK(object):
+    def __init__(self, js_file, image_dr, image_size,mask_shape = 28):
+        self.js_file = js_file
+        self.image_dr = image_dr
+        self.image_size = image_size
+        self.data = json.loads(open(self.js_file).read())
+        self.class_mapix = dict(zip(classes,range(len(classes))))
+        self.mask_shape = mask_shape
+        print(self.class_mapix)
+    def len(self):
+        return len(self.data)
+    def pull_item(self,idx):
+        item_data = self.data[idx]
+        image_name = item_data['name']
+        labels = item_data['labels']
+        label_ix = []
+        box = []
+        ig_data = io.imread(os.path.join(self.image_dr, image_name))
+
+        instance_masks = []
+        cls_ids = []
+        for ll in labels:
+            category_name = ll['category']
+            if category_name == 'drivable area':
+                if ll['attributes']['areaType'] == 'direct':
+                    pts = ll['poly2d']
+                    for x in pts:
+                        direct = np.zeros(shape=ig_data.shape, dtype=np.uint8)
+                        cv2.fillPoly(direct, [np.asarray(x['vertices'], np.int)] ,(255, 255, 255))
+                        cls_ids.append(0)
+                        instance_masks.append(direct[:,:,0])
+                elif ll['attributes']['areaType'] == 'alternative':
+                    pts = ll['poly2d']
+                    for x in pts:
+                        alter = np.zeros(shape=ig_data.shape, dtype=np.uint8)
+                        cv2.fillPoly(alter, [np.asarray(x['vertices'], np.int)], (255, 255, 255))
+                        cls_ids.append(1)
+                        instance_masks.append(alter[:, :, 0])
+        mask = np.asarray(instance_masks)
+        ig, window, scale, padding, crop = utils.resize_image_fixed_size(ig_data, self.image_size)
+        if len(labels) == 0:
+            return
+        mask = np.transpose(mask, axes=[1, 2, 0])
+        mask = utils.resize_mask(mask, scale, padding, crop)
+        image, mask = coco_handler.aug(ig, mask)
+
+        boxes = utils.extract_bboxes(mask)
+        mask = utils.minimize_mask(boxes, mask, mini_shape=(self.mask_shape, self.mask_shape))
+        #boxes = boxes /np.asarray([self.image_size[1], self.image_size[0],self.image_size[1], self.image_size[0]])
+        return ig, cls_ids, boxes, mask
 
 
 
@@ -106,12 +157,15 @@ def tt():
 
     for x in range(100):
         data_set.pull_item(x)
-tt()
+
 def get_class_num():
     image_dr = '/media/dsl/20d6b919-92e1-4489-b2be-a092290668e4/BDD100K/bdd100k/images/100k/train'
     js_file = '/media/dsl/20d6b919-92e1-4489-b2be-a092290668e4/BDD100K/label/labels/bdd100k_labels_images_train.json'
-    data_set = BDD_AREA(js_file=js_file, image_dr = image_dr, image_size = [768, 1280])
+    data_set = BDD_AREA_MASK(js_file=js_file, image_dr = image_dr, image_size = [768, 1280])
     ttlb = []
 
     for x in range(100):
-        data_set.pull_item(x)
+        ig, cls_ids, boxes, mask = data_set.pull_item(x)
+        print(cls_ids)
+        visual.display_instances(ig, boxes)
+
