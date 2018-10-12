@@ -70,7 +70,7 @@ class VOCDetection(object):
 
 
 def tt():
-    image_dr = '/media/dsl/20d6b919-92e1-4489-b2be-a092290668e4/VOCdevkit/VOCdevkit'
+    image_dr = 'D:/deep_learn_data/VOCdevkit'
     data_set = VOCDetection(root=image_dr,is_crop=True,  image_size = [512, 512])
     ttlb = []
     image_size = [512, 512]
@@ -79,7 +79,7 @@ def tt():
         result = data_set.pull_item(x)
         if result:
             ig, box, labels = data_set.pull_item(x)
-            if len(labels) >0 :
+            if labels is not None and len(labels) >0 :
                 box = box * np.asarray([image_size[1], image_size[0], image_size[1], image_size[0]])
                 print(box)
                 visual.display_instances(ig,box)

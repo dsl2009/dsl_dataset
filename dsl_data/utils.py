@@ -344,6 +344,11 @@ def crop_image_fixed_size(image, image_size):
     image_dtype = image.dtype
     h, w = image.shape[:2]
     scal = 1
+    if max(h,w)>1920:
+        image = cv2.resize(image, dsize=None, fx=0.5, fy=0.5)
+        scal = 0.5
+    h, w = image.shape[:2]
+
     if h<image_size[0] or w < image_size[1]:
         scal = max([image_size[0]/h, image_size[1]/w])
         image = cv2.resize(image, dsize=None, fx=scal, fy=scal)
@@ -373,8 +378,8 @@ def crop_image_with_box(image, image_size, box, labels):
     box[:, 3] = box[:, 3] - pading[1]
     box = np.clip(box, a_min=0, a_max=max(image_size))
     area = (box[:, 2]- box[:,0])*(box[:, 3]- box[:,1])
-    box = box[np.where(area>0)]
-    labels = labels[np.where(area>0)]
+    box = box[np.where(area>4)]
+    labels = labels[np.where(area>4)]
     return crop_image, box, labels
 
 

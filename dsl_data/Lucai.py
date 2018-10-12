@@ -8,9 +8,11 @@ from dsl_data import visual, utils
 from matplotlib import pyplot as plt
 import cv2
 from dsl_data import coco_handler
+from PIL import ImageFile
+ImageFile.LOAD_TRUNCATED_IMAGES = True
 classes = ['不导电', '擦花', '角位漏底', '桔皮', '漏底', '喷流', '漆泡', '起坑', '杂色', '脏点']
 class Lucai(object):
-    def __init__(self, image_dr, image_size, is_crop=False):
+    def __init__(self, image_dr, image_size, is_crop=True):
         self.image_dr = image_dr
         self.image_size = image_size
         l1 = glob.glob(os.path.join(image_dr,'*','*.jpg'))
@@ -52,16 +54,17 @@ class Lucai(object):
         return ig, box, label_ix
 def tt():
     image_dr = 'D:/deep_learn_data/luntai/round2'
-    data_set = Lucai(image_dr,  image_size=[960, 1280],is_crop=False)
+    data_set = Lucai(image_dr,  image_size=[512, 682],is_crop=False)
     ttlb = []
-    image_size = [960, 1280]
-
-    for x in range(100):
+    image_size = [512, 682]
+    index = range(data_set.len())
+    index = np.asarray(index)
+    np.random.shuffle(index)
+    for x in index:
         result = data_set.pull_item(x)
         if result:
             ig, box, labels = data_set.pull_item(x)
             if labels is not None and len(labels) > 0:
-                box = box * np.asarray([image_size[1], image_size[0], image_size[1], image_size[0]])
-                print(box)
-                print(labels)
+                box = box * np.asarray([image_size[1], image_size[0],image_size[1], image_size[0]])
                 visual.display_instances(ig, box)
+

@@ -29,6 +29,8 @@ class AiCh(object):
             cv2.fillPoly(mask, [pts], color=(255, 255, 255))
         ig, window, scale, padding, crop = utils.resize_image(ig, self.image_size, self.image_size)
         mask, window, scale, padding, crop = utils.resize_image(mask, self.image_size, self.image_size)
-        return ig, mask[:,:,0]
+        mask = np.asarray(mask[:,:,0], np.uint8)
+        mask = np.bitwise_not(mask)
+        return ig, mask
 
 
