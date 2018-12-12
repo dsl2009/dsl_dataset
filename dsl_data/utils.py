@@ -436,6 +436,14 @@ def extract_bboxes(mask):
             x1, x2, y1, y2 = 0, 0, 0, 0
         boxes[i] = np.array([x1, y1, x2, y2])
     return boxes.astype(np.int32)
+
+def extract_box_dsl(mask):
+    pass
+
+
+
+
+
 def minimize_mask(bbox, mask, mini_shape):
     """Resize masks to a smaller version to reduce memory load.
     Mini-masks can be resized back to image scale using expand_masks()

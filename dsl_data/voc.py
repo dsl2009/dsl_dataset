@@ -10,10 +10,14 @@ import numpy as np
 from skimage import io
 from dsl_data import visual
 
-classes = ['bicycle', 'bus', 'car', 'motorbike', 'person', 'rider', 'traffic light', 'traffic sign', 'train', 'truck']
-
+classes = [
+    'aeroplane', 'bicycle', 'bird', 'boat',
+    'bottle', 'bus', 'car', 'cat', 'chair',
+    'cow', 'diningtable', 'dog', 'horse',
+    'motorbike', 'person', 'pottedplant',
+    'sheep', 'sofa', 'train', 'tvmonitor']
 class VOCDetection(object):
-    def __init__(self, root, image_size,is_crop=True, image_sets=[ ('2007', 'trainval'),('2012', 'trainval')]):
+    def __init__(self, root, image_size,is_crop=False, image_sets=[ ('2007', 'trainval'),('2012', 'trainval')]):
         self.root = root
         self.image_set = image_sets
         self.image_size = image_size
@@ -47,6 +51,7 @@ class VOCDetection(object):
             if self.class_mapix.get(name, None) is not None:
                 label_idx = self.class_mapix[name]
                 labels.append(label_idx)
+                #labels.append(0)
                 boxes.append(bndbox)
         if len(boxes) == 0:
             return None, None, None
@@ -70,8 +75,8 @@ class VOCDetection(object):
 
 
 def tt():
-    image_dr = 'D:/deep_learn_data/VOCdevkit'
-    data_set = VOCDetection(root=image_dr,is_crop=True,  image_size = [512, 512])
+    image_dr = '/media/dsl/20d6b919-92e1-4489-b2be-a092290668e4/VOCdevkit/VOCdevkit'
+    data_set = VOCDetection(root=image_dr,is_crop=False,  image_size = [512, 512])
     ttlb = []
     image_size = [512, 512]
 
@@ -79,7 +84,7 @@ def tt():
         result = data_set.pull_item(x)
         if result:
             ig, box, labels = data_set.pull_item(x)
-            if labels is not None and len(labels) >0 :
+            if len(labels) >0 :
                 box = box * np.asarray([image_size[1], image_size[0], image_size[1], image_size[0]])
                 print(box)
                 visual.display_instances(ig,box)

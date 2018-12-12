@@ -83,7 +83,7 @@ def display_instances_title(image, boxes,  class_ids, class_names,
                       scores=None, title="",
                       figsize=(16, 16), ax=None,
                       show_mask=True, show_bbox=True,
-                      colors=None, captions=None):
+                      colors=None, captions=None, is_faster=False):
     """
     boxes: [num_instance, (y1, x1, y2, x2, class_id)] in image coordinates.
     masks: [height, width, num_instances]
@@ -123,7 +123,10 @@ def display_instances_title(image, boxes,  class_ids, class_names,
         if not np.any(boxes[i]):
             # Skip this instance. Has no bbox. Likely lost in image cropping.
             continue
-        x1, y1, x2, y2 = boxes[i]
+        if is_faster:
+            y1, x1, y2, x2 = boxes[i]
+        else:
+            x1, y1, x2, y2 = boxes[i]
 
         if show_bbox:
             p = patches.Rectangle((x1, y1), x2 - x1, y2 - y1, linewidth=2,
@@ -141,7 +144,7 @@ def display_instances_title(image, boxes,  class_ids, class_names,
         else:
             caption = captions[i]
         ax.text(x1, y1 + 8, caption,
-                color='w', size=11, backgroundcolor="black")
+                color='w', size=11, backgroundcolor='none')
 
 
     ax.imshow(masked_image.astype(np.uint8))

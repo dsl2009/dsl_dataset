@@ -7,10 +7,13 @@ import numpy as np
 from dsl_data import visual, utils
 from matplotlib import pyplot as plt
 import cv2
+from dsl_data import aug_utils
 from dsl_data import coco_handler
 from PIL import ImageFile
 ImageFile.LOAD_TRUNCATED_IMAGES = True
 classes = ['不导电', '擦花', '角位漏底', '桔皮', '漏底', '喷流', '漆泡', '起坑', '杂色', '脏点']
+
+
 class Lucai(object):
     def __init__(self, image_dr, image_size, is_crop=True):
         self.image_dr = image_dr
@@ -34,11 +37,14 @@ class Lucai(object):
         ig_data = io.imread(image_path)
         for b in js_data:
             category_name = b['label']
-            bound = np.asarray(b['points'])
-            minx, miny, maxx, maxy = min(bound[:, 0]), min(bound[:, 1]), max(bound[:, 0]), max(bound[:, 1]),
-            box.append([minx, miny, maxx, maxy])
-            label_ix.append(self.class_mapix[category_name])
+            if self.class_mapix.get(category_name, None) is not None:
+                bound = np.asarray(b['points'])
+                minx, miny, maxx, maxy = min(bound[:, 0]), min(bound[:, 1]), max(bound[:, 0]), max(bound[:, 1]),
+                box.append([minx, miny, maxx, maxy])
+                label_ix.append(self.class_mapix[category_name])
         box = np.asarray(box)
+        if box.shape[0] == 0:
+            return None,None,None
         if self.is_crop:
             ig, box, label_ix = utils.crop_image_with_box(ig_data, self.image_size, box, label_ix)
 
@@ -53,10 +59,11 @@ class Lucai(object):
         box = box/np.asarray([self.image_size[1], self.image_size[0],self.image_size[1], self.image_size[0]])
         return ig, box, label_ix
 def tt():
-    image_dr = 'D:/deep_learn_data/luntai/round2'
-    data_set = Lucai(image_dr,  image_size=[512, 682],is_crop=False)
+    image_dr = '/media/dsl/20d6b919-92e1-4489-b2be-a092290668e4/dsl/round2'
+    image_size = [896, 1024]
+    data_set = Lucai(image_dr,  image_size=image_size,is_crop=False)
     ttlb = []
-    image_size = [512, 682]
+
     index = range(data_set.len())
     index = np.asarray(index)
     np.random.shuffle(index)
@@ -65,6 +72,6 @@ def tt():
         if result:
             ig, box, labels = data_set.pull_item(x)
             if labels is not None and len(labels) > 0:
+                ig, box = aug_utils.fliplr_up_down(ig, box)
                 box = box * np.asarray([image_size[1], image_size[0],image_size[1], image_size[0]])
                 visual.display_instances(ig, box)
-
