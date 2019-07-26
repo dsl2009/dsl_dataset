@@ -4,7 +4,8 @@ import imgaug
 from matplotlib import pyplot as plt
 import skimage
 import tensorflow as tf
-
+from torchvision.transforms import transforms
+from PIL import Image
 import numpy as np
 def intersect(box_a, box_b):
     max_xy = np.minimum(box_a[:, 2:], box_b[2:])
@@ -50,3 +51,29 @@ def fliplr_up_down(img, box):
     box[:, 1] = ny1
     box[:, 3] = ny2
     return img,box
+
+def pytorch_aug_color(ig):
+    img = Image.fromarray(ig)
+    trans = transforms.Compose(
+        transforms.ColorJitter(brightness=0.4, contrast=0.4)
+    )
+    img = trans.transforms(img)
+    return np.asarray(img)
+
+def covert_d():
+    import glob
+    trans = transforms.Compose(
+        transforms.CenterCrop(size=(512, 512))
+    )
+    for x in glob.glob('/media/dsl/20d6b919-92e1-4489-b2be-a092290668e4/xair/ganze/*.jpg'):
+        ig = cv2.imread(x)
+        ig = cv2.cvtColor(ig, cv2.COLOR_BGR2RGB)
+        ig = Image.fromarray(ig)
+        ig = trans.transforms(ig)
+        ig = np.asarray(ig)
+        ig = cv2.cvtColor(ig, cv2.COLOR_RGB2BGR)
+        print(x.replace('ganze','tt'))
+        cv2.imwrite(x.replace('ganze','tt'),ig)
+
+
+

@@ -8,6 +8,8 @@ from dsl_data import visual
 from matplotlib import pyplot as plt
 import random
 from imgaug import augmenters as iaa
+from torchvision.transforms import transforms
+from dsl_data import aug_utils
 class Tree(object):
     def __init__(self, root_dr, image_size,mask_pool_size = 28):
         self.root_dr = root_dr
@@ -17,13 +19,7 @@ class Tree(object):
         self.aug = iaa.Sequential([
             iaa.Flipud(0.5),
             iaa.Fliplr(0.5),
-            iaa.Affine(
-                scale={"x": (0.9, 1.1), "y": (0.9, 1.1)},
-                rotate=(-30, 30),
-            ),
-
         ])
-
     def len(self):
         return len(self.images)
 
@@ -33,44 +29,71 @@ class Tree(object):
         bundry = json.loads(open(json_path).read().encode('utf8'))
         ig = cv2.imread(image_path)
         ig = cv2.cvtColor(ig, cv2.COLOR_BGR2RGB)
+        ig = aug_utils.pytorch_aug_color(ig)
         shape = ig.shape[0:2]
         total = len(bundry)
-        msk = np.zeros((shape[0], shape[1], total))
+        msk = np.zeros((shape[0], shape[1], total),dtype=np.uint8)
         ids = []
+        orchard = np.zeros(shape=(shape[0], shape[1], 3),dtype=np.uint8)
+        msk = []
 
         for idx, b in enumerate(bundry):
-            mask = np.zeros(shape=(shape[0], shape[1], 3))
-            pts = []
-            for p in b['boundary']:
-                pts.append([int(p['x']), int(p['y'])])
-            pts = np.array(pts, np.int32)
-            cv2.fillPoly(mask, [pts], color=(255, 255, 255))
+            if b['correction_type'] == 'tree':
+                mask = np.zeros(shape=(shape[0], shape[1], 3),dtype=np.uint8)
+                pts = []
+                for p in b['boundary']:
+                    pts.append([int(p['x']), int(p['y'])])
+                pts = np.array(pts, np.int32)
+                cv2.fillPoly(mask, [pts], color=(255, 255, 255))
 
-            msk[:, :, idx] = mask[:, :, 0]
-            ids.append(0)
+                msk.append(mask[:, :, 0:1])
+                ids.append(0)
+            elif b['correction_type'] == 'orchard':
+                mask = np.zeros(shape=(shape[0], shape[1], 3),dtype=np.uint8)
+                pts = []
+                for p in b['boundary']:
+                    pts.append([int(p['x']), int(p['y'])])
+                pts = np.array(pts, np.int32)
+                cv2.fillPoly(mask, [pts], color=(255, 255, 255))
+
+                orchard+=mask
+        ig = ig*(orchard/255)
+
+
+        if len(msk) > 1:
+            msk = np.concatenate(msk, axis=2)
+        elif len(msk) == 1:
+            msk = msk[0]
+        else:
+            return None
+
 
         ig, window, scale, padding, crop = utils.resize_image_fixed_size(ig, self.image_size)
         msk = utils.resize_mask(msk,scale,padding,crop)
-        if random.randint(0,1) ==1:
+        if random.randint(0,1) !=1:
             ag = self.aug.to_deterministic()
             ig = ag.augment_image(ig)
             msk = ag.augment_image(msk)
 
         box = utils.extract_bboxes(msk)
         ids = np.asarray(ids)
-        mj = (box[:,3] -box[:,1])*(box[:,2] -box[:,0])
-        mk = np.where(mj<self.image_size[0]*self.image_size[1]/3/3)
+
+        
+
+
+        mj = (box[:, 3] - box[:, 1]) * (box[:, 2] - box[:, 0])
+        mk = np.where(mj > self.image_size[0] * self.image_size[1] / 32 / 32)
+        box = box[mk]
+        ids = ids[mk]
+
+
+        mj = (box[:, 3] - box[:, 1]) / (box[:, 2] - box[:, 0])
+        mk = np.where(mj >0.25)
         box = box[mk]
         ids = ids[mk]
 
         mj = (box[:, 3] - box[:, 1]) / (box[:, 2] - box[:, 0])
-        mk = np.where(mj >0.5)
-        box = box[mk]
-        ids = ids[mk]
-
-        mj = (box[:, 3] - box[:, 1]) / (box[:, 2] - box[:, 0])
-
-        mk = np.where(mj < 2)
+        mk = np.where(mj < 4)
         box = box[mk]
         ids = ids[mk]
 
@@ -142,14 +165,6 @@ class Tree_mask(object):
         else:
             return None
 
-
-        orchard = np.expand_dims(np.sum(orchard, axis=2), -1)
-
-
-
-
-
-
         ig, window, scale, padding, crop = utils.resize_image_fixed_size(ig, self.image_size)
         msk = utils.resize_mask(msk,scale,padding,crop)
         orchard = utils.resize_mask(orchard,scale,padding,crop)
@@ -165,44 +180,46 @@ class Tree_mask(object):
 
 
         mj = (box[:,3] -box[:,1])*(box[:,2] -box[:,0])
-
-
         mk = np.where(mj<self.image_size[0]*self.image_size[1]/3/3)
         box = box[mk]
         ids = ids[mk]
         mask = mask[mk]
 
+        mj = (box[:, 3] - box[:, 1]) * (box[:, 2] - box[:, 0])
+        mk = np.where(mj > self.image_size[0] * self.image_size[1] / 32 / 32)
+        box = box[mk]
+        ids = ids[mk]
+        mask = mask[mk]
+
         mj = (box[:, 3] - box[:, 1]) / (box[:, 2] - box[:, 0])
-        mk = np.where(mj >0.4)
+        mk = np.where(mj >0.3)
         box = box[mk]
         ids = ids[mk]
         mask = mask[mk]
 
 
         mj = (box[:, 3] - box[:, 1]) / (box[:, 2] - box[:, 0])
-        mk = np.where(mj < 2.5)
-
-
+        mk = np.where(mj < 3)
         box = box[mk]
         ids = ids[mk]
         mask = mask[mk]
 
-
+        orchard = np.sum(orchard, axis=2)
         mask = np.transpose(mask, [1, 2, 0])
         #mask = utils.minimize_mask(box, mask, mini_shape=(28, 28))
         mask = np.sum(mask, 2)
         mask[np.where(mask>255)] = 255
         box = box / np.asarray([self.image_size[0], self.image_size[1], self.image_size[0], self.image_size[1]])
-        ig = ig*(orchard/255).astype(np.uint8)
+        #ig = ig*(orchard/255).astype(np.uint8)
         return ig, box,ids,mask
 
 
-class Tree_edge(object):
-    def __init__(self, root_dr, image_size,mask_pool_size = 28):
+class Tree_mask_ins(object):
+    def __init__(self, root_dr, image_size,mask_pool_size = 28, output_size=[128,128]):
         self.root_dr = root_dr
         self.image_size = image_size
         self.mask_pool_size = mask_pool_size
-        self.images = glob.glob(os.path.join(root_dr, '*', '*.png'))
+        self.images = glob.glob(os.path.join(root_dr,'*','*.png'))
         self.aug = iaa.Sequential([
             iaa.Flipud(0.5),
             iaa.Fliplr(0.5),
@@ -210,6 +227,10 @@ class Tree_edge(object):
                 scale={"x": (0.9, 1.1), "y": (0.9, 1.1)},
                 rotate=(-30, 30),
             ),
+
+        ])
+        self.factor = iaa.Sequential([
+            iaa.Scale(size=output_size),
         ])
 
     def len(self):
@@ -217,211 +238,121 @@ class Tree_edge(object):
 
     def pull_item(self,index):
         image_path = self.images[index]
-        json_path = image_path.replace('.png', '.json')
+        json_path = image_path.replace('.png','.json')
         bundry = json.loads(open(json_path).read().encode('utf8'))
         ig = cv2.imread(image_path)
         ig = cv2.cvtColor(ig, cv2.COLOR_BGR2RGB)
         shape = ig.shape[0:2]
-        total = len(bundry)
-        msk = np.zeros((shape[0], shape[1], total))
+        orchard = []
+        msk = []
         ids = []
-
         for idx, b in enumerate(bundry):
-            mask = np.zeros(shape=(shape[0], shape[1], 3))
-            pts = []
-            for p in b['boundary']:
-                pts.append([int(p['x']), int(p['y'])])
-            pts = np.array(pts, np.int32)
-            cv2.fillPoly(mask, [pts], color=(255, 255, 255))
+            if b['correction_type'] == 'tree':
+                mask = np.zeros(shape=(shape[0], shape[1], 3),dtype=np.uint8)
+                pts = []
+                for p in b['boundary']:
+                    pts.append([int(p['x']), int(p['y'])])
+                pts = np.array(pts, np.int32)
+                cv2.fillPoly(mask, [pts], color=(255, 255, 255))
 
-            msk[:, :, idx] = mask[:, :, 0]
-        msk = np.sum(msk,2)
-        msk[np.where(msk > 0)] = 255
-        if random.randint(0, 1) == 1:
+                msk.append(mask[:, :, 0:1])
+                ids.append(0)
+            elif b['correction_type'] == 'orchard':
+                mask = np.zeros(shape=(shape[0], shape[1], 3),dtype=np.uint8)
+                pts = []
+                for p in b['boundary']:
+                    pts.append([int(p['x']), int(p['y'])])
+                pts = np.array(pts, np.int32)
+                cv2.fillPoly(mask, [pts], color=(255, 255, 255))
+
+                orchard.append(mask[:, :, 0:1])
+
+
+        if len(msk)>1:
+            msk = np.concatenate(msk,axis=2)
+        elif len(msk) ==1:
+            msk = msk[0]
+        else:
+            return None
+
+
+
+        #ig, window, scale, padding, crop = utils.resize_image_fixed_size(ig, self.image_size)
+        #msk = utils.resize_mask(msk,scale,padding,crop)
+        #orchard = utils.resize_mask(orchard,scale,padding,crop)
+        if random.randint(0,1) ==1:
             ag = self.aug.to_deterministic()
             ig = ag.augment_image(ig)
             msk = ag.augment_image(msk)
-        return ig, msk
 
-class Tree_edge_loc(object):
-    def __init__(self, root_dr, image_size,mask_pool_size = 28):
-        self.root_dr = root_dr
-        self.image_size = image_size
-        self.mask_pool_size = mask_pool_size
-        self.images = glob.glob(os.path.join(root_dr, '*', '*.png'))
+        instance_masks = self.factor.augment_image(msk)
+        instance_masks[np.where(instance_masks >= 128)] = 255
+        instance_masks[np.where(instance_masks < 128)] = 0
 
+        seg_mask = np.sum(instance_masks, axis=2)
+        seg_mask[np.where(seg_mask > 255)] = 255
 
-    def len(self):
-        return len(self.images)
+        # remove too small
+        d = np.sum(instance_masks, axis=(0, 1))
+        k = np.where(d > 256 * 10)
 
-    def pull_item(self,index):
-        image_path = self.images[index]
-        json_path = image_path.replace('.png', '.json')
-        bundry = json.loads(open(json_path).read().encode('utf8'))
-        ig = cv2.imread(image_path)
-        ig = cv2.cvtColor(ig, cv2.COLOR_BGR2RGB)
-        shape = ig.shape[0:2]
-        orchard = []
-        msk = []
-        ids = []
-        mask = np.zeros(shape=(shape[0], shape[1], 5), dtype=np.float32)
-        for idx, b in enumerate(bundry):
-            if b['correction_type'] == 'tree':
-                boun = b['boundary'][0:-1]
-                for ix, p in enumerate(boun):
-                    c = np.zeros(shape=(shape[0], shape[1], 3), dtype=np.uint8)
-                    cv2.circle(c, center=(int(p['x']), int(p['y'])),radius=3, color=(255,255,255),thickness=-1)
+        instance_masks = instance_masks[:, :, k]
+        instance_masks = np.squeeze(instance_masks, axis=2)
 
-                    #mask[int(p['x']), int(p['y']), 0] = 1.0
-                    mask[:,:,0] = mask[:,:,0]+c[:,:,0]/255.0
-                    left = boun[ix-1]
-                    if ix== len(boun)-1:
-                        right = boun[0]
-                    else:
-                        right = boun[ix+1]
+        return ig, instance_masks, seg_mask, instance_masks.shape[2]
 
 
 
 
-                    mask[int(p['x']), int(p['y']), 1] = float(left['x'])/self.image_size[0]
-                    mask[int(p['x']), int(p['y']), 2] = float(left['y']) / self.image_size[1]
-
-                    mask[int(p['x']), int(p['y']), 3] = float(right['x']) / self.image_size[0]
-                    mask[int(p['x']), int(p['y']), 4] = float(right['y']) / self.image_size[1]
-
-
-        '''
-        plt.subplot(221)
-        plt.imshow( mask[:,:,0])
-        plt.subplot(222)
-        plt.imshow(mask[:, :, 1])
-
-        plt.subplot(223)
-        plt.imshow(mask[:, :, 2])
-        plt.subplot(224)
-        plt.imshow(mask[:, :, 3])
-
-        plt.show()
-        '''
 
 
 
-        return ig, mask
-
-
-class Tree_edge_coc(object):
-    def __init__(self, root_dr, image_size, mask_pool_size=28):
-        self.root_dr = root_dr
-        self.image_size = image_size
-        self.mask_pool_size = mask_pool_size
-        self.images = glob.glob(os.path.join(root_dr, '*', '*.png'))
-
-    def len(self):
-        return len(self.images)
-
-    def pull_item(self, index):
-        image_path = self.images[index]
-        json_path = image_path.replace('.png', '.json')
-        bundry = json.loads(open(json_path).read().encode('utf8'))
-        ig = cv2.imread(image_path)
-        ig = cv2.cvtColor(ig, cv2.COLOR_BGR2RGB)
-        shape = ig.shape[0:2]
-        orchard = []
-        msk = []
-        ids = []
-        mask = np.zeros(shape=(shape[0], shape[1], 3), dtype=np.uint8)
-        for idx, b in enumerate(bundry):
-            if b['correction_type'] == 'tree':
-                boun = b['boundary'][0:-1]
-
-                for ix, p in enumerate(boun):
-                    p0 = [int(p['x']), int(p['y'])]
-
-                    left = boun[ix - 1]
-                    if ix == len(boun) - 1:
-                        right = boun[0]
-                    else:
-                        right = boun[ix + 1]
-
-                    end_l = [int(left['x']), int(left['y'])]
-                    end_r = [int(right['x']), int(right['y'])]
-
-                    p1 = self.get_point(end_l, p0)
-                    p2 = self.get_point(end_r, p0)
-
-                    cv2.line(mask, pt1=tuple(p0),pt2=tuple(p1),color=(255,0,0),thickness=1)
-                    cv2.line(mask, pt1=tuple(p0), pt2=tuple(p2), color=(255, 0, 0), thickness=1)
 
 
 
-        plt.imshow(mask)
 
-        plt.show()
-
-        return ig, mask
-
-    def get_point(self, end_l, p0):
-        p1 = []
-        num = max([abs(p0[0] - end_l[0]), abs(p0[1] - end_l[1])])
-        st = min([p0[0], end_l[0]])
-        ed = max([p0[0], end_l[0]])
-        num = max(6,num )
-
-        xl = np.linspace(start=st, stop=ed, num=num)
-        if st == p0[0]:
-            p1.append(int(xl[2]))
-        else:
-            p1.append(int(xl[-2]))
-        st = min([p0[1], end_l[1]])
-        ed = max([p0[1], end_l[1]])
-        yl = np.linspace(start=st, stop=ed, num=num)
-        if st == p0[1]:
-            p1.append(int(yl[2]))
-        else:
-            p1.append(int(yl[-2]))
-        return p1
-
-
-def tt():
+def get_tree_msg():
+    from sklearn.cluster import KMeans
     image_dr = '/media/dsl/20d6b919-92e1-4489-b2be-a092290668e4/xair/biao_zhu/tree/'
     image_size = [256, 256]
-    data_set = Tree_mask(image_dr,  image_size=image_size)
-    ttlb = []
-    print(data_set.len())
+    data_set = Tree(image_dr, image_size=image_size)
+    d = []
+
     index = range(data_set.len())
-    index = np.asarray(index)
-
+    mx = 0
+    mn = 256
+    t = 0
     for x in index:
+        try:
+            ig, box, ids = data_set.pull_item(x)
+            mj = np.sqrt((box[:,2] - box[:,0])*(box[:,3] - box[:,1]))*256
 
-        result = data_set.pull_item(x)
+            if len(mj)>0:
+                d.extend(mj)
 
-        if result:
-            ig, box, ids, mask = data_set.pull_item(x)
-            plt.subplot(121)
-            plt.imshow(mask)
-            plt.subplot(122)
-            plt.imshow(ig)
-            plt.show()
+        except:
+            pass
+        if len(d)>100:
 
-            if ids is not None and len(ids) > 0:
-                box = box * np.asarray([image_size[1], image_size[0],image_size[1], image_size[0]])
-                mj = (box[:,2]-box[:,0])*(box[:,3]-box[:,1])
-                print(mj)
-                print(np.sqrt(mj))
+            cl = KMeans(n_clusters=12)
+            cl.fit(np.reshape(np.asarray(d),(-1,1)))
+            print(cl.cluster_centers_)
+    cl = KMeans(n_clusters=12)
+    cl.fit(np.asarray(d))
+    print(cl.cluster_centers_)
 
-                visual.display_instances(ig, box)
-def tt1():
+if __name__ == '__main__':
     image_dr = '/media/dsl/20d6b919-92e1-4489-b2be-a092290668e4/xair/biao_zhu/tree/'
     image_size = [256, 256]
-    data_set = Tree_edge_coc(image_dr,  image_size=image_size)
-    ttlb = []
+    data_set = Tree(image_dr, image_size=image_size)
+    '''
+        for i in range(100):
+        try:
+            ig, box, ids = data_set.pull_item(i)
+            visual.display_instances(ig, box)
+        except:
+            pass
+    '''
 
-    index = range(data_set.len())
-    index = np.asarray(index)
-    np.random.shuffle(index)
-    for x in index:
 
-        result = data_set.pull_item(x)
 
-        if result:
-            ig, mask = data_set.pull_item(x)
